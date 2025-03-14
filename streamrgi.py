@@ -39,7 +39,8 @@ PROMPTS = {
         13) Número do ITBI
         14) Valor total do ITBI
         15) Número da Inscrição Imobiliária
-        16) Data de pagamento do ITBI''',
+        16) Data de pagamento do ITBI
+        17)Cargo do representante do Cartório''',
     'averbacao_casamento': 'Extrair as seguintes informações em JSON: 1) Cartório da certidão; 2) Data do casamento; 3) Nome completo do Noivo 1; 4) Nome completo da Noiva; 5) Novo nome da Noiva; 6) Regime de Bens do Casamento; 7) Número da Matrícula; 8) Número da Folha; 9)Nome completo do Tabelião; 10)Livro 11) Averbações',
     'cedulas': 'Extrair as seguintes informações em JSON: 1) Número de Protocolo; 2) Emitente - Nome completo, Nacionalidade, Estado Civil, Nome dos Pais, Profissão, Residencia, Identidade, CPF; 3) Financiador - Nome completo da instituição, Tipo de entidade, Endereço completo da sede, CNPJ da instituição; 4) Agência do Financiador - Nome ou número da agência, Endereço da agência, CNPJ da agência específica; 5) Avalista - Nome completo, Filiação, Estado Civil, Ocupação, Endereço, CNH, CPF; 6) Título da Cédula - Tipo de Cédula, Número da Cédula, Data de Emissão, Data de Vencimento, Valor Principal, Valor por Extenso, Forma de Pagamento; 7) Garantias - Tipo de Garantia, Bem Garantido; 8) Localização dos bens vinculados - Imóvel, Matricula, Bairro, Endereço',
     'contrato': 'Extrair as seguintes informações em JSON: 1) Número de Protocolo; 2) Adquirente - Nome completo, Nacionalidade, Data de Nascimento, Estado Civil, Filiação, Ocupação,Email, Residencia, CNH, Data de Expedição da CNH, CPF; 3) Transmitente - Nome completo, Nacionalidade, Data de Nascimento, Estado Civil, Nome dos Pais, Profissão, Residencia, Email, CNH, Data de Expedição da CNH CPF; 4) Interveniente - Nome completo da Instituição, Tipo de Entidade, Endereço completo da sede, CNPJ; 5) Título de Contrato - Tipo de Contrato, Finalidade, Número de Contrato, Data de Lavratura, Local de Emissão; 6) Valor de Venda e Composição dos Recursos - Valor Total da Venda, Recursos Próprios, Recursos da Conta FGTS',
@@ -376,7 +377,7 @@ def format_escritura_publica(data: Dict) -> str:
               f"lavrada em data de {data.get('Data da escritura', 'Não informado')}, "
               f"no {data.get('Nome do cartório', 'Não informado')}, "
               f"por {data.get('Nome do representante do Cartório', 'Não informado')}, "
-              f"Tabelião Titular, livro de nº {data.get('Número do Livro', 'Não informado')}, "
+              f"{data.get('Cargo do representante do Cartório', 'Não informado')}, livro de nº {data.get('Número do Livro', 'Não informado')}, "
               f"Folhas {data.get('Folhas', 'Não informado')}. ")
     
     valor_venal = data.get('Valor Venal', 'Não informado')
