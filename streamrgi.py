@@ -16,17 +16,17 @@ PROMPTS = {
     'escritura_compra_venda': '''Extrair as seguintes informações em JSON:
         1) Adquirentes (Outorgados Compradores) - Array para cada um deles:
             - is_empresa: "yes" se for empresa, "no" se for pessoa física
-            - Se for pessoa física: Nome completo, Sexo, Nome do Pai, Nome da Mãe, Data de Nascimento, Local de Nascimento, Endereço, Cidade, Estado, CPF, RG, Estado Civil, Profissão
-            - Se for empresa: Nome da Empresa, CNPJ, Endereço da Sede
+            - Se for pessoa física: Nome completo, Sexo, Nome do Pai, Nome da Mãe, Data de Nascimento, Local de Nascimento, Endereço, Cidade, Estado, CPF, RG, Estado Civil (Se casado,também retornar regime de casamento e data de casamento), Profissão
+            - Se for empresa: Nome da Empresa,Tipo de Pessoa Juridica,CNPJ, Endereço da Sede
             - Para adquirentes pessoas físicas, identificar se são casados entre si e listar os pares correspondentes
         2) Transmitentes (Outorgante Vendedora) - Array para cada transmitente:
             - is_empresa: "yes" se for empresa, "no" se for pessoa física
-            - Se for pessoa física: Nome completo, Sexo, Nome do Pai, Nome da Mãe, Data de Nascimento, Local de Nascimento, Endereço, Cidade, Estado, CPF, RG, Estado Civil, Profissão
-            - Se for empresa: Nome da Empresa, CNPJ, Endereço da Sede
+            - Se for pessoa física: Nome completo, Sexo, Nome do Pai, Nome da Mãe, Data de Nascimento, Local de Nascimento, Endereço, Cidade, Estado, CPF, RG, Estado Civil(Se casado,também retornar regime de casamento e data de casamento), Profissão
+            - Se for empresa: Nome da Empresa,Tipo de Pessoa Juridica,CNPJ, Endereço da Sede
         3) Intervenientes - Array para cada interveniente:
             - is_empresa: "yes" se for empresa, "no" se for pessoa física
-            - Se for pessoa física: Nome completo, Nome do Pai, Nome da Mãe, Endereço, Cidade, Estado, CPF, RG, Estado Civil, Profissão
-            - Se for empresa: Nome da Empresa, CNPJ, Endereço da Sede
+            - Se for pessoa física: Nome completo,Sexo, Nome do Pai, Nome da Mãe,Data de Nascimento, Local de Nascimento, Endereço, Cidade, Estado, CPF, RG, Estado Civil(Se casado,também retornar regime de casamento e data de casamento), Profissão
+            - Se for empresa: Nome da Empresa, Tipo de Pessoa Juridica, CNPJ, Endereço da Sede
         4) Casamentos entre adquirentes - Array de pares indicando quais adquirentes estão casados entre si
         5) Título da escritura
         6) Nome do representante do Cartório
@@ -218,7 +218,8 @@ def format_escritura_publica(data: Dict) -> str:
                 
                 # Check if adquirente is a company
                 if adq.get('is_empresa', 'no').lower() == 'yes':
-                    output += (f"**{adq.get('Nome da Empresa', 'Não informado')}**, "
+                    output += (f"**{adq.get('Nome da Empresa', 'Não informado')}**, " 
+                              f"{adq.get('Tipo de Pessoa Juridica', 'Não informado')}, " 
                               f"cadastrada no Cadastro Nacional de Pessoa Jurídica sob o número "
                               f"{adq.get('CNPJ', 'Não informado')}, "
                               f"Sediada em {adq.get('Endereço da Sede', 'Não informado')}")
@@ -299,6 +300,7 @@ def format_escritura_publica(data: Dict) -> str:
                 # Check if transmitente is a company
                 if trans.get('is_empresa', 'no').lower() == 'yes':
                     output += (f"**{trans.get('Nome da Empresa', 'Não informado')}**, "
+                              f"{trans.get('Tipo de Pessoa Juridica', 'Não informado')}, " 
                               f"cadastrada no Cadastro Nacional de Pessoa Jurídica sob o número "
                               f"{trans.get('CNPJ', 'Não informado')}, "
                               f"Sediada em {trans.get('Endereço da Sede', 'Não informado')}")
@@ -324,6 +326,51 @@ def format_escritura_publica(data: Dict) -> str:
             output += ". "
         except (SyntaxError, TypeError):
             output += "Erro ao processar dados dos transmitentes. "
+
+    if 'Intervenientes' in data and data['Intervenientes']:
+        try:
+            intervenientes_list = data['Intervenientes']
+            if isinstance(intervenientes_list, str):
+                intervenientes_list = eval(intervenientes_list)
+                
+            intervenientes_count = len(intervenientes_list)
+            output += "__**INTERVENIENTES**__: " if intervenientes_count > 1 else "__**INTERVENIENTES**__: "
+            
+            for index, interv in enumerate(intervenientes_list):
+                if index > 0:
+                    output += ". "
+                
+                # Check if transmitente is a company
+                if interv.get('is_empresa', 'no').lower() == 'yes':
+                    output += (f"**{interv.get('Nome da Empresa', 'Não informado')}**, "
+                              f"{interv.get('Tipo de Pessoa Juridica', 'Não informado')}, " 
+                              f"cadastrada no Cadastro Nacional de Pessoa Jurídica sob o número "
+                              f"{interv.get('CNPJ', 'Não informado')}, "
+                              f"Sediada em {interv.get('Endereço da Sede', 'Não informado')}")
+                else:
+                    # Normal person formatting
+                    nome_completo = interv.get('Nome completo', interv.get('Nome', 'Não informado'))
+                    sexo = interv.get('Sexo', '').lower()
+                    filho_filha = 'filha' if sexo == 'feminino' else 'filho'
+                    inscrito_inscrita = 'inscrita' if sexo == 'feminino' else 'inscrito'
+                    domiciliado_domiciliada = 'domiciliada' if sexo == 'feminino' else 'domiciliado'
+                    nascido_nascida = 'nascida' if sexo == 'feminino' else 'nascido'
+                    
+                    output += (f"**{nome_completo}**, "
+                              f"{interv.get('Estado Civil', 'Não informado')}, "
+                              f"{interv.get('Profissão', 'Não informado')}, "
+                              f"{nascido_nascida} em {interv.get('Data de Nascimento', 'Não informado')}, "
+                              f"natural de {interv.get('Local de Nascimento', 'Não informado')}, "
+                              f"{filho_filha} de {interv.get('Nome do Pai', 'Não informado')} e "
+                              f"{interv.get('Nome da Mãe', 'Não informado')}, "
+                              f"{inscrito_inscrita} na CNH sob o Nº {interv.get('RG', 'Não informado')} "
+                              f"expedida no DETRAN/ES, e no CPF/MF sob o Nº {interv.get('CPF', 'Não informado')}, "
+                              f"residente e {domiciliado_domiciliada} na {interv.get('Endereço', 'Não informado')}")
+            output += ". "
+        except (SyntaxError, TypeError):
+            output += "Erro ao processar dados dos Intervenientes. "
+
+
     
     output += (f"__**TÍTULO**__: **{data.get('Título da escritura', 'Não informado')}**, "
               f"lavrada em data de {data.get('Data da escritura', 'Não informado')}, "
