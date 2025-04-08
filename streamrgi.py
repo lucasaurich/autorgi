@@ -27,20 +27,24 @@ PROMPTS = {
             - is_empresa: "yes" se for empresa, "no" se for pessoa física
             - Se for pessoa física: Nome completo,Sexo, Nome do Pai, Nome da Mãe,Data de Nascimento, Local de Nascimento, Endereço, Cidade, Estado, CPF, RG, Estado Civil(Se casado,também retornar regime de casamento e data de casamento), Profissão
             - Se for empresa: Nome da Empresa, Tipo de Pessoa Juridica, CNPJ, Endereço da Sede
-        4) Casamentos entre adquirentes - Array de pares indicando quais adquirentes estão casados entre si
-        5) Título da escritura
-        6) Nome do representante do Cartório
-        7) Nome do cartório
-        8) Data da escritura
-        9) Número do Livro
-        10) Folhas
-        11) Valor do objeto
-        12) Valor Venal
-        13) Número do ITBI
-        14) Valor total do ITBI
-        15) Número da Inscrição Imobiliária
-        16) Data de pagamento do ITBI
-        17)Cargo do representante do Cartório''',
+        4) Anuentes - Array para cada anuente:
+            - is_empresa: "yes" se for empresa, "no" se for pessoa física
+            - Se for pessoa física: Nome completo,Sexo, Nome do Pai, Nome da Mãe,Data de Nascimento, Local de Nascimento, Endereço, Cidade, Estado, CPF, RG, Estado Civil(Se casado,também retornar regime de casamento e data de casamento), Profissão
+            - Se for empresa: Nome da Empresa, Tipo de Pessoa Juridica, CNPJ, Endereço da Sede
+        5) Casamentos entre adquirentes - Array de pares indicando quais adquirentes estão casados entre si
+        6) Título da escritura
+        7) Nome do representante do Cartório
+        8) Nome do cartório
+        9) Data da escritura
+        10)Número do Livro
+        11) Folhas
+        12) Valor avaliado pela prefeitura
+        13) Valor Venal
+        14) Número do ITBI
+        15) Valor total do ITBI
+        16) Número da Inscrição Imobiliária
+        17) Data de pagamento do ITBI
+        18)Cargo do representante do Cartório''',
     'averbacao_casamento': 'Extrair as seguintes informações em JSON: 1) Cartório da certidão; 2) Data do casamento; 3) Nome completo do Noivo 1; 4) Nome completo da Noiva; 5) Novo nome da Noiva; 6) Regime de Bens do Casamento; 7) Número da Matrícula; 8) Número da Folha; 9)Nome completo do Tabelião; 10)Livro 11) Averbações',
     'cedulas': 'Extrair as seguintes informações em JSON: 1) Número de Protocolo; 2) Emitente - Nome completo, Nacionalidade, Estado Civil, Nome dos Pais, Profissão, Residencia, Identidade, CPF; 3) Financiador - Nome completo da instituição, Tipo de entidade, Endereço completo da sede, CNPJ da instituição; 4) Agência do Financiador - Nome ou número da agência, Endereço da agência, CNPJ da agência específica; 5) Avalista - Nome completo, Filiação, Estado Civil, Ocupação, Endereço, CNH, CPF; 6) Título da Cédula - Tipo de Cédula, Número da Cédula, Data de Emissão, Data de Vencimento, Valor Principal, Valor por Extenso, Forma de Pagamento; 7) Garantias - Tipo de Garantia, Bem Garantido; 8) Localização dos bens vinculados - Imóvel, Matricula, Bairro, Endereço',
     'contrato': 'Extrair as seguintes informações em JSON: 1) Número de Protocolo; 2) Adquirente - Nome completo, Nacionalidade, Data de Nascimento, Estado Civil, Filiação, Ocupação,Email, Residencia, CNH, Data de Expedição da CNH, CPF; 3) Transmitente - Nome completo, Nacionalidade, Data de Nascimento, Estado Civil, Nome dos Pais, Profissão, Residencia, Email, CNH, Data de Expedição da CNH CPF; 4) Interveniente - Nome completo da Instituição, Tipo de Entidade, Endereço completo da sede, CNPJ; 5) Título de Contrato - Tipo de Contrato, Finalidade, Número de Contrato, Data de Lavratura, Local de Emissão; 6) Valor de Venda e Composição dos Recursos - Valor Total da Venda, Recursos Próprios, Recursos da Conta FGTS',
@@ -51,6 +55,9 @@ PROMPTS = {
 
 OCR_CLEANUP_PROMPT = "Analise esse texto extraído, remova os erros OCR, marcas d'agua e informações desnecessárias enquanto mantém o mesmo formato, faça o resultado do texto estar fully justified"
 
+def sanitize_text(text: str) -> str:
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
 def clean_and_format_text(text: str) -> str:
     """Clean and format OCR text"""
     # Remove header and footer artifacts
@@ -335,7 +342,7 @@ def format_escritura_publica(data: Dict) -> str:
                 intervenientes_list = eval(intervenientes_list)
                 
             intervenientes_count = len(intervenientes_list)
-            output += "__**INTERVENIENTES**__: " if intervenientes_count > 1 else "__**INTERVENIENTES**__: "
+            output += "__**INTERVENIENTES**__: " if intervenientes_count > 1 else "__**INTERVENIENTE**__: "
             
             for index, interv in enumerate(intervenientes_list):
                 if index > 0:
@@ -371,6 +378,49 @@ def format_escritura_publica(data: Dict) -> str:
         except (SyntaxError, TypeError):
             output += "Erro ao processar dados dos Intervenientes. "
 
+    if 'Anuentes' in data and data['Anuentes']:
+        try:
+            anuentes_list = data['Anuentes']
+            if isinstance(anuentes_list, str):
+                anuentes_list = eval(anuentes_list)
+                
+            anuentes_count = len(anuentes_list)
+            output += "__**ANUENTES**__: " if anuentes_count > 1 else "__**ANUENTE**__: "
+            
+            for index, adqui in enumerate(anuentes_list):
+                if index > 0:
+                    output += ". "
+                
+                # Check if transmitente is a company
+                if adqui.get('is_empresa', 'no').lower() == 'yes':
+                    output += (f"**{adqui.get('Nome da Empresa', 'Não informado')}**, "
+                              f"{adqui.get('Tipo de Pessoa Juridica', 'Não informado')}, " 
+                              f"cadastrada no Cadastro Nacional de Pessoa Jurídica sob o número "
+                              f"{adqui.get('CNPJ', 'Não informado')}, "
+                              f"Sediada em {adqui.get('Endereço da Sede', 'Não informado')}")
+                else:
+                    # Normal person formatting
+                    nome_completo = adqui.get('Nome completo', adqui.get('Nome', 'Não informado'))
+                    sexo = adqui.get('Sexo', '').lower()
+                    filho_filha = 'filha' if sexo == 'feminino' else 'filho'
+                    inscrito_inscrita = 'inscrita' if sexo == 'feminino' else 'inscrito'
+                    domiciliado_domiciliada = 'domiciliada' if sexo == 'feminino' else 'domiciliado'
+                    nascido_nascida = 'nascida' if sexo == 'feminino' else 'nascido'
+                    
+                    output += (f"**{nome_completo}**, "
+                              f"{adqui.get('Estado Civil', 'Não informado')}, "
+                              f"{adqui.get('Profissão', 'Não informado')}, "
+                              f"{nascido_nascida} em {adqui.get('Data de Nascimento', 'Não informado')}, "
+                              f"natural de {adqui.get('Local de Nascimento', 'Não informado')}, "
+                              f"{filho_filha} de {adqui.get('Nome do Pai', 'Não informado')} e "
+                              f"{adqui.get('Nome da Mãe', 'Não informado')}, "
+                              f"{inscrito_inscrita} na CNH sob o Nº {adqui.get('RG', 'Não informado')} "
+                              f"expedida no DETRAN/ES, e no CPF/MF sob o Nº {adqui.get('CPF', 'Não informado')}, "
+                              f"residente e {domiciliado_domiciliada} na {adqui.get('Endereço', 'Não informado')}")
+            output += ". "
+        except (SyntaxError, TypeError):
+            output += "Erro ao processar dados dos Anuentes. "
+
 
     
     output += (f"__**TÍTULO**__: **{data.get('Título da escritura', 'Não informado')}**, "
@@ -380,11 +430,15 @@ def format_escritura_publica(data: Dict) -> str:
               f"{data.get('Cargo do representante do Cartório', 'Não informado')}, livro de nº {data.get('Número do Livro', 'Não informado')}, "
               f"Folhas {data.get('Folhas', 'Não informado')}. ")
     
-    valor_venal = data.get('Valor Venal', 'Não informado')
+    valor_venal = sanitize_text(data.get('Valor Venal', 'Não informado'))
     original_value, converted_value = format_money_value(valor_venal)
     output += f"VALOR VENAL: {original_value} ({converted_value}). "
     
-    valor_itbi = data.get('Valor total do ITBI', 'Não informado')
+    valor_aval = sanitize_text(data.get('Valor avaliado pela prefeitura', 'Não informado'))
+    original_aval, converted_aval = format_money_value(valor_aval)
+    output += f"VALOR AVALIADO PELA PMA: {original_aval} ({converted_aval}). "
+    
+    valor_itbi = sanitize_text(data.get('Valor total do ITBI', 'Não informado'))
     original_itbi, converted_itbi = format_money_value(valor_itbi)
     output += (f"VALOR PAGO DO ITBI: Valor {original_itbi} ({converted_itbi}) - "
               f"Nº do ITBI {data.get('Número do ITBI', 'Não informado')} - "
