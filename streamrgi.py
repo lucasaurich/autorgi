@@ -31,7 +31,7 @@ PROMPTS = {
             - is_empresa: "yes" se for empresa, "no" se for pessoa física
             - Se for pessoa física: Nome completo,Sexo, Nome do Pai, Nome da Mãe,Data de Nascimento, Local de Nascimento, Endereço, Cidade, Estado, CPF, RG, Estado Civil(Se casado,também retornar regime de casamento e data de casamento), Profissão
             - Se for empresa: Nome da Empresa, Tipo de Pessoa Juridica, CNPJ, Endereço da Sede
-        5) Casamentos entre adquirentes - Array de pares indicando quais adquirentes estão casados entre si
+        5) Casamentos entre adquirentes - Array de pares indicando quais adquirentes estão casados entre si, Data de Casamento e o Regime de Bens
         6) Título da escritura
         7) Nome do representante do Cartório
         8) Nome do cartório
@@ -179,6 +179,8 @@ def format_escritura_publica(data: Dict) -> str:
     
     # Check for married couples in adquirentes
     married_couples = {}
+    marriage_details = {} 
+
     if 'Casamentos entre adquirentes' in data and data['Casamentos entre adquirentes']:
         try:
             marriages = data['Casamentos entre adquirentes']
@@ -188,19 +190,34 @@ def format_escritura_publica(data: Dict) -> str:
             for marriage in marriages:
                 if isinstance(marriage, dict):
                     for couple_key, couple_value in marriage.items():
+                        # Extract marriage details if available
+                        regime_bens = marriage.get('Regime de Bens', marriage.get('Regime de Bens', 'Não informado'))
+                        data_casamento = marriage.get('Data de Casamento', marriage.get('Data de Casamento', 'Não informado'))
+                        
                         if isinstance(couple_value, str):
                             names = couple_value.split(' e ')
                             if len(names) == 2:
                                 married_couples[names[0].strip()] = names[1].strip()
                                 married_couples[names[1].strip()] = names[0].strip()
+                                # Store marriage details
+                                marriage_details[names[0].strip()] = {
+                                    'regime_bens': regime_bens,
+                                    'data_casamento': data_casamento
+                                }
                         elif isinstance(couple_value, list) and len(couple_value) == 2:
                             # Handle case where couple_value is already a list of names
                             married_couples[couple_value[0].strip()] = couple_value[1].strip()
                             married_couples[couple_value[1].strip()] = couple_value[0].strip()
+                            # Store marriage details
+                            marriage_details[couple_value[0].strip()] = {
+                                'regime_bens': regime_bens,
+                                'data_casamento': data_casamento
+                            }
                 elif isinstance(marriage, list) and len(marriage) == 2:
                     # Handle case where marriage is a list of two names
                     married_couples[marriage[0].strip()] = marriage[1].strip()
                     married_couples[marriage[1].strip()] = marriage[0].strip()
+                    # Note: In this case, we don't have marriage details to extract
         except (SyntaxError, TypeError, AttributeError) as e:
             # Handle case where data might not be in the expected format
             pass
@@ -240,9 +257,25 @@ def format_escritura_publica(data: Dict) -> str:
                     domiciliado_domiciliada = 'domiciliada' if sexo == 'feminino' else 'domiciliado'
                     nascido_nascida = 'nascida' if sexo == 'feminino' else 'nascido'
                     
+                    # Check if this person is in a marriage
+                    is_married = nome_completo in married_couples
+                    spouse_name = married_couples.get(nome_completo)
+                    
+                    # Get the marriage details if they exist
+                    marriage_info = marriage_details.get(nome_completo, {})
+                    regime_bens = marriage_info.get('regime_bens', 'Não informado')
+                    data_casamento = marriage_info.get('data_casamento', 'Não informado')
+                    
+                    # Modify the estado civil to include marriage details if this is a married person
+                    estado_civil_base = adq.get('Estado Civil', 'Não informado')
+                    estado_civil_with_details = estado_civil_base
+                    
+                    if is_married and estado_civil_base.lower() in ['casado', 'casada']:
+                        estado_civil_with_details = f"{estado_civil_base} sob o regime de {regime_bens}, em {data_casamento}"
+                    
                     # Format the person without the spouse initially
                     output += (f"**{nome_completo}**, "
-                              f"{adq.get('Estado Civil', 'Não informado')}, "
+                              f"{estado_civil_with_details}, "  # Use modified estado civil with marriage details
                               f"{adq.get('Profissão', 'Não informado')}, "
                               f"{nascido_nascida} em {adq.get('Data de Nascimento', 'Não informado')}, "
                               f"natural de {adq.get('Local de Nascimento', 'Não informado')}, "
@@ -254,9 +287,7 @@ def format_escritura_publica(data: Dict) -> str:
                               f"residente e {domiciliado_domiciliada} na {adq.get('Endereço', 'Não informado')}")
                     
                     # Check if this person has a spouse among adquirentes
-                    if nome_completo in married_couples:
-                        spouse_name = married_couples[nome_completo]
-                        
+                    if is_married:
                         # Find the spouse in the adquirentes_list to get their details
                         spouse_data = None
                         for spouse_adq in adquirentes_list:
@@ -275,9 +306,8 @@ def format_escritura_publica(data: Dict) -> str:
                             spouse_domiciliado_domiciliada = 'domiciliada' if spouse_sexo == 'feminino' else 'domiciliado'
                             spouse_nascido_nascida = 'nascida' if spouse_sexo == 'feminino' else 'nascido'
                             
-                            # Add spouse information at the end of the current adquirente's information
+                            # Add spouse information WITHOUT including Estado Civil details again
                             output += f" e seu cônjuge **{spouse_name}**, " + \
-                                      f"{spouse_data.get('Estado Civil', 'Não informado')}, " + \
                                       f"{spouse_data.get('Profissão', 'Não informado')}, " + \
                                       f"{spouse_nascido_nascida} em {spouse_data.get('Data de Nascimento', 'Não informado')}, " + \
                                       f"natural de {spouse_data.get('Local de Nascimento', 'Não informado')}, " + \
